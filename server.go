@@ -28,7 +28,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // callback url
-func authHandler(w http.ResponseWriter, r *http.Request) {
+func goodHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 func badHandler(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,7 @@ func main() {
 	}
 	fmt.Println(cfg)
 	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/auth", authHandler)
+	http.HandleFunc("/good", goodHandler)
 	http.HandleFunc("/bad", badHandler)
 	log.Fatal(http.ListenAndServe(":10999", nil))
 }
