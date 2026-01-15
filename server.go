@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+
+	"golang.org/x/oauth2"
 )
 
 func loadFile(path string) []byte {
@@ -17,19 +21,33 @@ func loadFile(path string) []byte {
 	return dat
 }
 
-var discord_redirect_string = "https://discord.com/oauth2/authorize?client_id=%s&response_type=code&redirect_uri=https://%s/good&scope=guilds"
 var atproto_redirect_string = "https://?"
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
+	conf := &oauth2.Config{
+		ClientID:     cfg["discord_client_id"].(string),
+		ClientSecret: cfg["discord_client_secret"].(string),
+		Scopes:       []string{"identify", "guilds"},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "https://discord.com/oauth2/authorize",
+			TokenURL: "https://discord.com/api/oauth2/token",
+		},
+	}
+	verf := oauth2.GenerateVerifier()
+	dat := make([]byte, 16)
+	_, err := rand.Read(dat)
+	if err != nil {
+		panic(1)
+	}
+	state := base64.URLEncoding.EncodeToString(dat)
+	url := conf.AuthCodeURL(state, oauth2.S256ChallengeOption(verf))
 	tmpl := template.Must(template.ParseFiles("./static/login.html"))
 	tmpl.Execute(w, map[string]string{
-		"DiscordRedirect": fmt.Sprintf(discord_redirect_string, cfg["discord_client_id"], cfg["hostname"]),
+		"DiscordRedirect": url,
 		"ATProtoRedirect": "",
 	})
-
 }
 func authHandler(w http.ResponseWriter, r *http.Request) {
-
 	if r.Header.Get("Authorization") == "" {
 		host := r.Header.Get("X-Forwarded-Host")
 		uri := r.Header.Get("X-Forwarded-Uri")
@@ -39,18 +57,15 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// callback url
-func goodHandler(w http.ResponseWriter, r *http.Request) {
-	from := r.Header.Get("Referer")
-	if from == "https://discord.com/" { //highly opinionated
+func callbackHandler(w http.ResponseWriter, r *http.Request) {
+	from := r.PathValue("provider")
+	if from == "discord" {
+
 		//oauth !
 		return
-	}else{ // this is probably atproto but i'll get that exact url later
- 		return
+	} else { // this is probably atproto but i'll get that exact url later
+		return
 	}
-}
-func badHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write(loadFile("./static/bad.html"))
 }
 
 var cfg map[string]interface{}
@@ -63,8 +78,7 @@ func main() {
 	fmt.Println(cfg)
 	http.HandleFunc("/", loginHandler)
 	http.HandleFunc("/auth", authHandler)
-	http.HandleFunc("/good", goodHandler)
-	http.HandleFunc("/bad", badHandler)
+	http.HandleFunc("/callback/{provider}", callbackHandler)
 	fmt.Println("listening on port:", cfg["port"])
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", cfg["port"].(string)), nil))
 }

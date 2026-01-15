@@ -4,5 +4,5 @@
   "discord_client_id": "",
   "discord_client_secret": "",
   "tailscale_sock": "/var/run/tailscale/tailscaled.sock",
-  "hostname": "example.com",
+  "hostname": "auth.example.com",
 }
