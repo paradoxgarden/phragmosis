@@ -50,9 +50,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	dat := getRandBytes(16)
 	verf := oauth2.GenerateVerifier()
 	state := base64.URLEncoding.EncodeToString(dat)
-	enc, _ := sc.Encode("oauth_meta",map[string]string{
-		"state": state,
-		"verf": verf,
+	enc, _ := sc.Encode("oauth_meta", map[string]string{
+		"state":    state,
+		"verf":     verf,
+		"redirect": r.URL.Query().Get("redirect"),
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -62,7 +63,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:  300,
+		MaxAge:   300,
 	})
 	url := conf.AuthCodeURL(state, oauth2.S256ChallengeOption(verf))
 	tmpl := template.Must(template.ParseFiles("./static/login.html"))
@@ -75,10 +76,24 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	host := r.Header.Get("X-Forwarded-Host")
 	uri := r.Header.Get("X-Forwarded-Uri")
 	original_dest := "https://" + host + uri
-	if r.Header.Get("Authorization") == "" {
-		http.Redirect(w, r, fmt.Sprintf("https://%s/login?redirect=%s", cfg["hostname"], original_dest), http.StatusFound)
-	} else {
-		http.Redirect(w, r, original_dest, http.StatusOK)
+	cookie, err := r.Cookie("token")
+		fmt.Println(cookie)
+		fmt.Println(err)
+
+	if err != http.ErrNoCookie {
+		var auth map[string]interface{}
+		err = sc.Decode("token", cookie.Value, &auth)
+		fmt.Println(auth)
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+	if cfg["subdomain"] != nil {
+
+	http.Redirect(w, r, fmt.Sprintf("https://%s.%s/login?redirect=%s", cfg["subdomain"], cfg["domain_name"], original_dest), http.StatusFound)
+	} else{
+	http.Redirect(w, r, fmt.Sprintf("https://%s/login?redirect=%s", cfg["domain_name"], original_dest), http.StatusFound)
+
 	}
 }
 
@@ -87,7 +102,7 @@ var sc = securecookie.New(
 	getRandBytes(32),
 )
 
-func errChk(err error){
+func errChk(err error) {
 	if err != nil {
 		log.Println(err)
 	}
@@ -96,31 +111,42 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	from := r.PathValue("provider")
 	if from == "discord" {
 		cookie, err := r.Cookie("oauth_meta")
-			errChk(err)
-		var data map[string]string
-			sc.Decode("oauth_meta",cookie.Value, &data)
-		if data["state"] != r.URL.Query().Get("state") {
+		errChk(err)
+		var oauth_meta map[string]string
+		sc.Decode("oauth_meta", cookie.Value, &oauth_meta)
+		if oauth_meta["state"] != r.URL.Query().Get("state") {
 			return
 		}
-			payload := url.Values{}
-			payload.Set("grant_type", "authorization_code")
-			payload.Set("code", r.URL.Query()["code"][0])
-			payload.Set("code_verifier", data["verf"])
-			client := &http.Client{}
+		payload := url.Values{}
+		payload.Set("grant_type", "authorization_code")
+		payload.Set("code", r.URL.Query()["code"][0])
+		payload.Set("code_verifier", oauth_meta["verf"])
+		client := &http.Client{}
 
-			req, err := http.NewRequest("POST", discord_endpoints.TokenURL, strings.NewReader(payload.Encode()))
-			errChk(err)
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			req.SetBasicAuth(cfg["discord_client_id"].(string), cfg["discord_client_secret"].(string))
+		req, err := http.NewRequest("POST", discord_endpoints.TokenURL, strings.NewReader(payload.Encode()))
+		errChk(err)
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req.SetBasicAuth(cfg["discord_client_id"].(string), cfg["discord_client_secret"].(string))
 		resp, err := client.Do(req)
 		log.Println(resp)
-		log.Println(err)
 		defer resp.Body.Close()
 		var res map[string]interface{}
 
 		json.NewDecoder(resp.Body).Decode(&res)
-		fmt.Println(res)
-		return
+		enc, err := sc.Encode("token", res)
+		http.SetCookie(w, &http.Cookie{
+			Name:     "token",
+			Value:    enc,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			Domain: cfg["domain_name"].(string),
+			MaxAge:   300,
+		})
+		fmt.Println(oauth_meta["redirect"])
+		http.Redirect(w, r, oauth_meta["redirect"], http.StatusFound)
+
 	}
 }
 
