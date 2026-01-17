@@ -57,7 +57,7 @@ func loadFromEnv(c Config) Config {
 	}
 	discordClientSecret := os.Getenv("DISCORD_CLIENT_SECRET")
 	if discordClientSecret != "" {
-		c.DiscordClientID = &discordClientSecret
+		c.DiscordClientSecret = &discordClientSecret
 	}
 	tailscale := os.Getenv("TAILSCALE_SOCK")
 	if tailscale != "" {
