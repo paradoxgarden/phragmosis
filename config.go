@@ -2,11 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"io"
+	"fmt"
 	"os"
 	"strings"
-	"sync"
-	"time"
 )
 
 type Config struct {
@@ -18,27 +16,19 @@ type Config struct {
 	DomainName          *string  `json:"domainName"`
 	Subdomain           *string  `json:"subdomain"`
 	Port                *string  `json:"port"`
+	AllowedDomains      []string `json:"allowedDomains"`
 	HashKey             *string  `json:"hashKey"`
 	BlockKey            *string  `json:"blockKey"`
 }
 
-var (
-	cachedConfig  Config
-	configLastMod *time.Time
-	configMu      sync.Mutex
-)
-
 // load precedence no overwrites
 // ENV > config.json > generate
 func loadConfig() Config {
-	configMu.Lock()
-	defer configMu.Unlock()
 
 	var c Config
 	c = loadFromJson(c)
 	c = loadFromEnv(c)
 
-	cachedConfig = c
 	return c
 
 }
@@ -83,32 +73,23 @@ func loadFromEnv(c Config) Config {
 	if block != "" {
 		c.BlockKey = &block
 	}
+	allowedDomains := os.Getenv("ALLOWED_DOMAINS")
+	if allowedDomains != "" {
+		c.AllowedDomains = strings.Split(allowedDomains, ",")
+	}
 	return c
 }
 
 func loadFromJson(c Config) Config {
 	configPath := "./config.json"
-	info, err := os.Stat(configPath)
+	dat, err := os.ReadFile(configPath)
 	if err != nil {
+		fmt.Println(err)
 		return c
 	}
-	lastMod := info.ModTime()
-	if configLastMod != nil && lastMod.Equal(*configLastMod) {
-		return cachedConfig
-	}
-	file, err := os.Open(configPath)
-	if err != nil {
-		return c
-	}
-	defer file.Close()
-	dat, err := io.ReadAll(file)
-	if err != nil {
-		return c
-	}
-	configLastMod = &lastMod
-
 	err = json.Unmarshal(dat, &c)
 	if err != nil {
+		fmt.Println(err)
 		return c
 	}
 	return c
