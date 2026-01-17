@@ -1,9 +1,12 @@
 {
-  "didAllowList": [did:plc:ewvi7nxzyoun6zhxrhs64oiz"],
+  "didAllowList": ["did:plc:ewvi7nxzyoun6zhxrhs64oiz"],
   "discordGuildID":  "613425648685547541",
   "discordClientID": "",
   "discordClientSecret": "",
   "tailscaleSock": "/var/run/tailscale/tailscaled.sock",
   "domainName": "example.com",
-  "subdomain": "auth"
+  "subdomain": "auth",
+  "port": "10999",
+  "hashKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+  "blockKey": ""AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==,
 }
