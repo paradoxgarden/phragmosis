@@ -23,9 +23,9 @@ type Config struct {
 }
 
 var (
-	cachedConfig   Config
-	configLastRead time.Time
-	configMu       sync.Mutex
+	cachedConfig  Config
+	configLastMod *time.Time
+	configMu      sync.Mutex
 )
 
 // load precedence no overwrites
@@ -34,12 +34,12 @@ func loadConfig() Config {
 	configMu.Lock()
 	defer configMu.Unlock()
 
-	var config Config
-	config = loadFromJson(config)
-	config = loadFromEnv(config)
+	var c Config
+	c = loadFromJson(c)
+	c = loadFromEnv(c)
 
-	cachedConfig = config
-	return config
+	cachedConfig = c
+	return c
 
 }
 func loadFromEnv(c Config) Config {
@@ -51,9 +51,13 @@ func loadFromEnv(c Config) Config {
 	if discordGuild != "" {
 		c.DiscordGuildID = &discordGuild
 	}
-	discordClient := os.Getenv("DISCORD_CLIENT_ID")
-	if discordClient != "" {
-		c.DiscordClientID = &discordClient
+	discordClientID := os.Getenv("DISCORD_CLIENT_ID")
+	if discordClientID != "" {
+		c.DiscordClientID = &discordClientID
+	}
+	discordClientSecret := os.Getenv("DISCORD_CLIENT_SECRET")
+	if discordClientSecret != "" {
+		c.DiscordClientID = &discordClientSecret
 	}
 	tailscale := os.Getenv("TAILSCALE_SOCK")
 	if tailscale != "" {
@@ -84,6 +88,14 @@ func loadFromEnv(c Config) Config {
 
 func loadFromJson(c Config) Config {
 	configPath := "./config.json"
+	info, err := os.Stat(configPath)
+	if err != nil {
+		return c
+	}
+	lastMod := info.ModTime()
+	if configLastMod != nil && lastMod.Equal(*configLastMod) {
+		return cachedConfig
+	}
 	file, err := os.Open(configPath)
 	if err != nil {
 		return c
@@ -93,11 +105,8 @@ func loadFromJson(c Config) Config {
 	if err != nil {
 		return c
 	}
-	info, err := file.Stat()
-	if err != nil {
-		return c
-	}
-	configLastRead = info.ModTime()
+	configLastMod = &lastMod
+
 	err = json.Unmarshal(dat, &c)
 	if err != nil {
 		return c

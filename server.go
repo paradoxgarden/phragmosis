@@ -28,26 +28,29 @@ var discordEndpoints = oauth2.Endpoint{
 	TokenURL: "https://discord.com/api/oauth2/token",
 }
 
+var loginPageTemplate = template.Must(template.ParseFiles("./static/login.html"))
+
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	config := loadConfig()
+	discordClient := *config.DiscordClientID
+	discordSecret := *config.DiscordClientSecret
 	conf := &oauth2.Config{
-		ClientID:     *config.DiscordClientID,
-		ClientSecret: *config.DiscordClientSecret,
+		ClientID:     discordClient,
+		ClientSecret: discordSecret,
 		Scopes:       []string{"identify", "guilds"},
 		Endpoint:     discordEndpoints,
 	}
 	verf := oauth2.GenerateVerifier()
 	state := base64.URLEncoding.EncodeToString(getRandBytes(16))
-	redirect := r.URL.Query().Get("redirect")
-	fmt.Println(redirect)
-	if strings.HasPrefix(redirect, "http:") || strings.HasPrefix(redirect, "/") {
+	redirect, _ := url.Parse(r.URL.Query().Get("redirect"))
+	if strings.HasPrefix(redirect.String(), "http:") || strings.HasPrefix(redirect.String(), "/") {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	enc, _ := sc.Encode("oauth_meta", map[string]string{
 		"state":    state,
 		"verf":     verf,
-		"redirect": redirect,
+		"redirect": redirect.String(),
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -59,37 +62,31 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   300,
 	})
-	url := conf.AuthCodeURL(state, oauth2.S256ChallengeOption(verf))
-	tmpl := template.Must(template.ParseFiles("./static/login.html"))
-	tmpl.Execute(w, map[string]string{
-		"DiscordRedirect": url,
+	discordURL := conf.AuthCodeURL(state, oauth2.S256ChallengeOption(verf))
+	loginPageTemplate.Execute(w, map[string]string{
+		"DiscordRedirect": discordURL,
 		"ATProtoRedirect": "",
 	})
 }
-func redirectLogin(w http.ResponseWriter, r *http.Request, config Config, originalDest string) {
-	if config.Subdomain != nil {
-		http.Redirect(w, r, fmt.Sprintf("https://%s.%s/?redirect=%s", *config.Subdomain, *config.DomainName, originalDest), http.StatusFound)
-	} else {
-		http.Redirect(w, r, fmt.Sprintf("https://%s/?redirect=%s", *config.DomainName, originalDest), http.StatusFound)
-	}
-}
 
-func authHandler(w http.ResponseWriter, r *http.Request) {
-	config := loadConfig()
+func redirectLogin(w http.ResponseWriter, r *http.Request) {
 	host := r.Header.Get("X-Forwarded-Host")
 	uri := r.Header.Get("X-Forwarded-Uri")
 	originalDest := "https://" + host + uri
+	http.Redirect(w, r, fmt.Sprintf("%s?redirect=%s", selfDomain, originalDest), http.StatusFound)
+}
+
+func authHandler(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("token")
 
 	if err == http.ErrNoCookie {
-		redirectLogin(w, r, config, originalDest)
+		redirectLogin(w, r)
 		return
 	}
-
 	var auth map[string]interface{}
 	err = sc.Decode("token", cookie.Value, &auth)
 	if err != nil {
-		redirectLogin(w, r, config, originalDest)
+		redirectLogin(w, r)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -98,8 +95,8 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	config := loadConfig()
 	from := r.PathValue("provider")
-	switch {
-	case from == "discord":
+	switch from {
+	case "discord":
 		cookie, _ := r.Cookie("oauth_meta")
 		var oauth_meta map[string]string
 		sc.Decode("oauth_meta", cookie.Value, &oauth_meta)
@@ -154,10 +151,17 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 var sc securecookie.SecureCookie
+var selfDomain string
 
 func main() {
 	config := loadConfig()
 	fmt.Println(config)
+	if cachedConfig.Subdomain != nil {
+		selfDomain = fmt.Sprintf("https://%s.%s/", *config.Subdomain, *config.DomainName)
+	} else {
+		selfDomain = fmt.Sprintf("https://%s/", *config.DomainName)
+	}
+
 	if config.BlockKey == nil || config.HashKey == nil {
 		sc = *securecookie.New(getRandBytes(32), getRandBytes(32))
 	} else {
