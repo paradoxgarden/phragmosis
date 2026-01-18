@@ -8,16 +8,16 @@ import (
 	"github.com/gorilla/securecookie"
 )
 
-func initSecureCookie(blockKey *string, hashKey *string) securecookie.SecureCookie {
+func initSecureCookie(blockKey *string, hashKey *string) (securecookie.SecureCookie, error) {
 	var sc securecookie.SecureCookie
 	if blockKey == nil || hashKey == nil {
 		hash, err := getRandBytes(32)
 		if err != nil {
-			log.Fatal("randomness as we know it has ceased")
+			return sc, err
 		}
 		block, err := getRandBytes(32)
 		if err != nil {
-			log.Fatal("randomness as we know it has ceased")
+			return sc, err
 		}
 		sc = *securecookie.New(hash, block)
 	} else {
@@ -32,7 +32,7 @@ func initSecureCookie(blockKey *string, hashKey *string) securecookie.SecureCook
 		sc = *securecookie.New(hash, block)
 	}
 	sc.MaxAge(604800)
-	return sc
+	return sc, nil
 }
 func getRandBytes(n int) ([]byte, error) {
 	dat := make([]byte, n)

@@ -18,8 +18,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var atproto_redirect_string = "https://?"
-
 func (s *server) loginHandler(w http.ResponseWriter, r *http.Request) {
 	verf := oauth2.GenerateVerifier()
 	stateRand, err := getRandBytes(16)
@@ -145,8 +143,7 @@ func (s *server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-		cl := &http.Client{Timeout: time.Second * 10}
-		guildsResp, err := cl.Do(req)
+		guildsResp, err := s.cl.Do(req)
 		if err != nil {
 			s.fail(w, r, "discord api error", err, slog.LevelError)
 			return
@@ -199,6 +196,7 @@ type server struct {
 	discordEndpoints   oauth2.Endpoint
 	discord            bool
 	atproto            bool
+	cl                 http.Client
 }
 
 //go:embed static/*
@@ -239,7 +237,12 @@ func initServ(c config) *server {
 	} else {
 		s.selfDomain = fmt.Sprintf("%s/", *c.DomainName)
 	}
-	s.sc = initSecureCookie(c.BlockKey, c.HashKey)
+	s.cl = http.Client{Timeout: time.Second * 10}
+	cookie, err := initSecureCookie(c.BlockKey, c.HashKey)
+	if err != nil {
+		log.Fatal("creating securecookie failed: ", err)
+	}
+	s.sc = cookie
 	s.config = c
 	return s
 }
@@ -252,7 +255,7 @@ func main() {
 	if *c.Debug {
 		logLevel = slog.LevelDebug
 	}
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level:logLevel}))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
 	s := initServ(*c)
 	http.HandleFunc("/", s.loginHandler)
