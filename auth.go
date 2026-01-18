@@ -11,7 +11,15 @@ import (
 func initSecureCookie(blockKey *string, hashKey *string) securecookie.SecureCookie {
 	var sc securecookie.SecureCookie
 	if blockKey == nil || hashKey == nil {
-		sc = *securecookie.New(getRandBytes(32), getRandBytes(32))
+		hash, err := getRandBytes(32)
+		if err != nil {
+			log.Fatal("randomness as we know it has ceased")
+		}
+		block, err := getRandBytes(32)
+		if err != nil {
+			log.Fatal("randomness as we know it has ceased")
+		}
+		sc = *securecookie.New(hash, block)
 	} else {
 		hash, err := base64.StdEncoding.DecodeString(*hashKey)
 		if err != nil {
@@ -26,11 +34,11 @@ func initSecureCookie(blockKey *string, hashKey *string) securecookie.SecureCook
 	sc.MaxAge(604800)
 	return sc
 }
-func getRandBytes(n int) []byte {
+func getRandBytes(n int) ([]byte, error) {
 	dat := make([]byte, n)
 	_, err := rand.Read(dat)
 	if err != nil {
-		log.Fatal("randomness as we know it has ceased")
+		return nil, err
 	}
-	return dat
+	return dat, nil
 }

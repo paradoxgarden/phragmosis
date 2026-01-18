@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -24,103 +24,110 @@ type config struct {
 	BlockKey            *string  `json:"blockKey"`
 }
 
-// load precedence no overwrites
-// ENV > config.json > generate
-func loadConfig() config {
+// load precedence
+// generated keys < json < ENV
+func loadConfig() (*config, error) {
+	c := &config{}
 
-	var c config
-	c.loadFromJson()
-	c.loadFromEnv()
-	c.validateConfig()
-	return c
-
+	path := "./config.json"
+	err := c.loadFromJson(path)
+	if err != nil {
+		slog.Info("./config.json not found, server will crash if env vars do not provide enough resources to run")
+	}
+	c.loadFromEnv(os.Getenv)
+	err = c.validateConfig()
+	if err != nil {
+		return nil, err
+	}
+	return c, err
 }
-func (c *config) validateConfig() {
+func (c *config) validateConfig() error {
 
-	if c.Port == nil {
+	if c.Port != nil {
 		_, err := strconv.Atoi(*c.Port)
 		if err != nil {
-			log.Fatal("no port provided, unable to start server")
+			return fmt.Errorf("no port provided, unable to start server")
 		}
 	}
 	if len(c.AllowedDomains) == 0 {
-		log.Fatal("no allowed domains specified, server will not do anything")
+		return fmt.Errorf("no allowed domains specified, server will not do anything")
 	}
 	if c.DomainName == nil {
-		log.Fatal("domain name unspecified, unable to start server")
+		return fmt.Errorf("domain name unspecified, unable to start server")
 	}
 	if c.DiscordClientID == nil && c.DiscordClientSecret == nil && c.DiscordGuildID == nil &&
 		c.DidAllowList == nil &&
 		c.TailscaleSock == nil {
-		log.Fatal("no way to auth specified, server will not do anything")
+		return fmt.Errorf("no way to auth specified, server will not do anything")
 	}
 	if c.Debug == nil {
 		c.Debug = new(bool)
 		*c.Debug = false
 	}
+	return nil
 }
-func (c *config) loadFromEnv() {
-	didList := os.Getenv("PHRAG_DID_ALLOW_LIST")
+func (c *config) loadFromEnv(env func(string) string) {
+	didList := env("PHRAG_DID_ALLOW_LIST")
 	if didList != "" {
 		c.DidAllowList = strings.Split(didList, ",")
 	}
-	discordGuild := os.Getenv("PHRAG_DISCORD_GUILD_ID")
+	discordGuild := env("PHRAG_DISCORD_GUILD_ID")
 	if discordGuild != "" {
 		c.DiscordGuildID = &discordGuild
 	}
-	discordClientID := os.Getenv("PHRAG_DISCORD_CLIENT_ID")
+	discordClientID := env("PHRAG_DISCORD_CLIENT_ID")
 	if discordClientID != "" {
 		c.DiscordClientID = &discordClientID
 	}
-	discordClientSecret := os.Getenv("PHRAG_DISCORD_CLIENT_SECRET")
+	discordClientSecret := env("PHRAG_DISCORD_CLIENT_SECRET")
 	if discordClientSecret != "" {
 		c.DiscordClientSecret = &discordClientSecret
 	}
-	tailscale := os.Getenv("PHRAG_TAILSCALE_SOCK")
+	tailscale := env("PHRAG_TAILSCALE_SOCK")
 	if tailscale != "" {
 		c.TailscaleSock = &tailscale
 	}
-	domain := os.Getenv("PHRAG_DOMAIN_NAME")
+	domain := env("PHRAG_DOMAIN_NAME")
 	if domain != "" {
 		c.DomainName = &domain
 	}
-	subdomain := os.Getenv("PHRAG_SUBDOMAIN")
+	subdomain := env("PHRAG_SUBDOMAIN")
 	if subdomain != "" {
 		c.Subdomain = &subdomain
 	}
-	port := os.Getenv("PHRAG_PORT")
+	port := env("PHRAG_PORT")
 	if port != "" {
 		c.Port = &port
 	}
-	debug := os.Getenv("PHRAG_DEBUG")
+	debug := env("PHRAG_DEBUG")
 	if debug != "" {
 		b, _ := strconv.ParseBool(debug)
 		// if parseBool throws an error it returns false, which is ok for debug
 		c.Debug = new(bool)
 		*c.Debug = b
 	}
-	hash := os.Getenv("PHRAG_HASH_KEY")
+	hash := env("PHRAG_HASH_KEY")
 	if hash != "" {
 		c.HashKey = &hash
 	}
-	block := os.Getenv("PHRAG_BLOCK_KEY")
+	block := env("PHRAG_BLOCK_KEY")
 	if block != "" {
 		c.BlockKey = &block
 	}
-	allowedDomains := os.Getenv("PHRAG_ALLOWED_DOMAINS")
+	allowedDomains := env("PHRAG_ALLOWED_DOMAINS")
 	if allowedDomains != "" {
 		c.AllowedDomains = strings.Split(allowedDomains, ",")
 	}
 }
 
-func (c *config) loadFromJson() {
-	configPath := "./config.json"
-	dat, err := os.ReadFile(configPath)
+func (c *config) loadFromJson(path string) error {
+	dat, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 	err = json.Unmarshal(dat, &c)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
+	return nil
 }
