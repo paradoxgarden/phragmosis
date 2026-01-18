@@ -38,7 +38,7 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	goodDom := false
 	for _, dom := range s.config.AllowedDomains {
-		if strings.HasSuffix(redirect.Hostname(), "." + dom) {
+		if redirect.Host == dom || strings.HasSuffix(redirect.Hostname(), "."+dom) {
 			goodDom = true
 		}
 	}
@@ -46,11 +46,15 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 		s.redirectLogin(w, r)
 		return
 	}
-	enc, _ := s.sc.Encode("oauth_meta", map[string]string{
+	enc, err := s.sc.Encode("oauth_meta", map[string]string{
 		"state":    state,
 		"verf":     verf,
 		"redirect": redirect.String(),
 	})
+	if err != nil {
+		s.redirectLogin(w, r)
+		return
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_meta",
@@ -108,7 +112,12 @@ func (s *Server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		payload := url.Values{}
 		payload.Set("grant_type", "authorization_code")
-		payload.Set("code", r.URL.Query()["code"][0])
+		codes := r.URL.Query()["code"]
+		if len(codes) == 0 {
+			s.redirectLogin(w, r)
+			return
+		}
+		payload.Set("code", codes[0])
 		payload.Set("code_verifier", oauth_meta["verf"])
 
 		req, err := http.NewRequest("POST", s.discordEndpoints.TokenURL, strings.NewReader(payload.Encode()))
@@ -117,11 +126,11 @@ func (s *Server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req.SetBasicAuth(*s.config.DiscordClientID, *s.config.DiscordClientSecret)
-		cl := http.DefaultClient
-		cl.Timeout = time.Second * 10
+		cl := &http.Client{Timeout: 10 * time.Second}
 		resp, err := cl.Do(req)
 		if err != nil {
 			s.redirectLogin(w, r)
+			return
 		}
 		defer resp.Body.Close()
 		var res map[string]interface{}
@@ -129,15 +138,18 @@ func (s *Server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 		err = json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
 			s.redirectLogin(w, r)
+			return
 		}
 		req, err = http.NewRequest("GET", "https://discord.com/api/users/@me/guilds", nil)
 		if err != nil {
 			s.redirectLogin(w, r)
+			return
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", res["access_token"]))
 		guildsResp, err := cl.Do(req)
 		if err != nil {
 			s.redirectLogin(w, r)
+			return
 		}
 		var guilds []struct {
 			ID string `json:"id"`
@@ -145,10 +157,12 @@ func (s *Server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 		err = json.NewDecoder(guildsResp.Body).Decode(&guilds)
 		if err != nil {
 			s.redirectLogin(w, r)
+			return
 		}
 		enc, err := s.sc.Encode("token", res)
 		if err != nil {
 			s.redirectLogin(w, r)
+			return
 		}
 		for _, g := range guilds {
 			if *s.config.DiscordGuildID == g.ID {

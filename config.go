@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -28,9 +30,26 @@ func loadConfig() Config {
 	var c Config
 	c = loadFromJson(c)
 	c = loadFromEnv(c)
-
+	c.validateConfig()
 	return c
 
+}
+func (c *Config) validateConfig() {
+	_, err := strconv.Atoi(*c.Port)
+	if c.Port == nil || err != nil {
+		log.Fatal("no port provided, unable to start server")
+	}
+	if len(c.AllowedDomains) == 0 {
+		log.Fatal("no allowed domains specified, server will not do anything")
+	}
+	if c.DomainName == nil {
+		log.Fatal("domain name unspecified, unable to start server")
+	}
+	if c.DiscordClientID == nil && c.DiscordClientSecret == nil && c.DiscordGuildID == nil &&
+		c.DidAllowList == nil &&
+		c.TailscaleSock == nil {
+		log.Fatal("no way to auth specified, server will not do anything")
+	}
 }
 func loadFromEnv(c Config) Config {
 	didList := os.Getenv("DID_ALLOW_LIST")
