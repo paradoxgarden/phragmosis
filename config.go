@@ -24,13 +24,13 @@ type config struct {
 	BlockKey            *string  `json:"blockKey"`
 }
 
+var configPath = "./config.json"
 // load precedence
 // generated keys < json < ENV
 func loadConfig() (*config, error) {
 	c := &config{}
 
-	path := "./config.json"
-	err := c.loadFromJson(path)
+	err := c.loadFromJson(configPath)
 	if err != nil {
 		slog.Info("./config.json not found, server will crash if env vars do not provide enough resources to run")
 	}

@@ -8,8 +8,8 @@ import (
 	"github.com/gorilla/securecookie"
 )
 
-func initSecureCookie(blockKey *string, hashKey *string) (securecookie.SecureCookie, error) {
-	var sc securecookie.SecureCookie
+func initSecureCookie(blockKey *string, hashKey *string) (*securecookie.SecureCookie, error) {
+	var sc *securecookie.SecureCookie
 	if blockKey == nil || hashKey == nil {
 		hash, err := getRandBytes(32)
 		if err != nil {
@@ -19,7 +19,7 @@ func initSecureCookie(blockKey *string, hashKey *string) (securecookie.SecureCoo
 		if err != nil {
 			return sc, err
 		}
-		sc = *securecookie.New(hash, block)
+		sc = securecookie.New(hash, block)
 	} else {
 		hash, err := base64.StdEncoding.DecodeString(*hashKey)
 		if err != nil {
@@ -29,7 +29,7 @@ func initSecureCookie(blockKey *string, hashKey *string) (securecookie.SecureCoo
 		if err != nil {
 			log.Fatal("provided block key is not b64 encoded")
 		}
-		sc = *securecookie.New(hash, block)
+		sc = securecookie.New(hash, block)
 	}
 	sc.MaxAge(604800)
 	return sc, nil

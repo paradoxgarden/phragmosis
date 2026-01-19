@@ -8,6 +8,6 @@
   "subdomain": "auth",
   "port": "10999",
   "hashKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-  "blockKey": ""AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==,
+  "blockKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==,
   "allowedDomains": ["example.com", "mydomain.com"]
 }

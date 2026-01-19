@@ -205,7 +205,7 @@ var static embed.FS
 func initServ(c config) *server {
 
 	s := &server{}
-	if c.DiscordGuildID != nil || c.DiscordClientID != nil || c.DiscordClientSecret != nil {
+	if c.DiscordGuildID != nil && c.DiscordClientID != nil && c.DiscordClientSecret != nil {
 		s.discord = true
 	} else {
 		s.discord = false
@@ -242,7 +242,7 @@ func initServ(c config) *server {
 	if err != nil {
 		log.Fatal("creating securecookie failed: ", err)
 	}
-	s.sc = cookie
+	s.sc = *cookie
 	s.config = c
 	return s
 }
