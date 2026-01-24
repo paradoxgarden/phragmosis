@@ -19,7 +19,7 @@ type config struct {
 	Subdomain           *string  `json:"subdomain"`
 	Port                *string  `json:"port"`
 	Debug               *bool    `json:"debug"`
-	AllowedDomains      []string `json:"allowedDomains"`
+	AllowedDomains []string `json:"allowedDomains"`
 	HashKey             *string  `json:"hashKey"`
 	BlockKey            *string  `json:"blockKey"`
 }
@@ -49,9 +49,6 @@ func (c *config) validateConfig() error {
 			return fmt.Errorf("no port provided, unable to start server")
 		}
 	}
-	if len(c.AllowedDomains) == 0 {
-		return fmt.Errorf("no allowed domains specified, server will not do anything")
-	}
 	if c.DomainName == nil {
 		return fmt.Errorf("domain name unspecified, unable to start server")
 	}
@@ -66,6 +63,7 @@ func (c *config) validateConfig() error {
 	}
 	return nil
 }
+// this is ugly but it's explicit
 func (c *config) loadFromEnv(env func(string) string) {
 	didList := env("PHRAG_DID_ALLOW_LIST")
 	if didList != "" {
@@ -116,7 +114,7 @@ func (c *config) loadFromEnv(env func(string) string) {
 	}
 	allowedDomains := env("PHRAG_ALLOWED_DOMAINS")
 	if allowedDomains != "" {
-		c.AllowedDomains = strings.Split(allowedDomains, ",")
+		c.DidAllowList = strings.Split(didList, ",")
 	}
 }
 

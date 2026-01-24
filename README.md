@@ -4,7 +4,8 @@ SSO portal
 
 designed to not need an LDAP server, just allow / deny based on a list
 
-takes the user management lifecycle entirely out of your hands
+statelessly takes the user management lifecycle entirely out of your hands
+
 
 phragmosis is currently a WIP!
 

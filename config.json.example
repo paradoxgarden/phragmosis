@@ -9,5 +9,4 @@
   "port": "10999",
   "hashKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
   "blockKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==,
-  "allowedDomains": ["example.com", "mydomain.com"]
 }
