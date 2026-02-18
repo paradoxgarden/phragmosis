@@ -25,6 +25,7 @@ type token struct {
 	Iat     string
 }
 
+// check token expiration, refresh if close to time
 func (*token) Valid() bool {
 	// TODO check token expiry
 	return true
@@ -35,6 +36,7 @@ type validationError string
 func (e validationError) Error() string {
 	return string(e)
 }
+// make discord token exchange and ensure token recieved is good
 func getDiscordToken(ctx context.Context, discord oauth2.Config, code string, PKCE string) (*oauth2.Token, error) {
 	token, err := discord.Exchange(ctx, code, oauth2.VerifierOption(PKCE))
 	if err != nil {
@@ -45,6 +47,7 @@ func getDiscordToken(ctx context.Context, discord oauth2.Config, code string, PK
 	}
 	return token, nil
 }
+// read the user's oauth metadata from browser cookies
 func getUserMeta(r *http.Request, sc securecookie.SecureCookie) (*oauthMeta, error) {
 	cookie, err := r.Cookie("oauthMeta")
 	if err != nil {
@@ -75,6 +78,7 @@ type CRSFError struct {
 func (e *CRSFError) Error() string {
 	return fmt.Sprintf("CSRF validation error: %s vs %s", e.orig, e.new)
 }
+// initialize securecookie with config provided (or generate) keys
 func initSecureCookie(blockKey *string, hashKey *string) (*securecookie.SecureCookie, error) {
 	var sc *securecookie.SecureCookie
 	if blockKey == nil || hashKey == nil {
@@ -101,6 +105,7 @@ func initSecureCookie(blockKey *string, hashKey *string) (*securecookie.SecureCo
 	sc.MaxAge(604800)
 	return sc, nil
 }
+// return an array of bytes size n
 func getRandBytes(n int) ([]byte, error) {
 	dat := make([]byte, n)
 	_, err := rand.Read(dat)
@@ -109,6 +114,7 @@ func getRandBytes(n int) ([]byte, error) {
 	}
 	return dat, nil
 }
+// generate the oauthmetadata struct 
 func genOAuthMeta(redirect string) (*oauthMeta, error) {
 	stateRand, err := getRandBytes(16)
 	if err != nil {

@@ -22,6 +22,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// ensure user redirect isn't malicious or malformed
 func verifyRedirect(redir string, domain string) (string, error) {
 
 	if redir == "/" {
@@ -41,6 +42,8 @@ func verifyRedirect(redir string, domain string) (string, error) {
 
 	return u.String(), nil
 }
+
+// render & serve the login page
 func (s *server) loginHandler(w http.ResponseWriter, r *http.Request) {
 	redir := r.FormValue("redirect")
 	goodRedirect, err := verifyRedirect(redir, *s.cfg.DomainName)
@@ -70,6 +73,8 @@ func (s *server) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+// an error has occured, force the user to restart the process
 func (s *server) fail(w http.ResponseWriter, r *http.Request, rzn string, err error, level slog.Level) {
 	if err != nil {
 		slog.Log(r.Context(), level, rzn, "error", err, "path", r.URL.Path)
@@ -83,6 +88,8 @@ func (s *server) fail(w http.ResponseWriter, r *http.Request, rzn string, err er
 		s.redirect(w, r, "/error?rzn=bad internal redirect")
 	}
 }
+
+// send the user to their intended destination (happy path)
 func (s *server) redirect(w http.ResponseWriter, r *http.Request, path string) error {
 	host := r.Header.Get("X-Forwarded-Host")
 	uri := r.Header.Get("X-Forwarded-Uri")
@@ -98,6 +105,8 @@ func (s *server) redirect(w http.ResponseWriter, r *http.Request, path string) e
 	return nil
 }
 
+// forward auth route
+// if this fails, the user is sent to the login page
 func (s *server) authHandler(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("token")
 
@@ -119,6 +128,8 @@ func (s *server) authHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 }
+
+// write a cookie to the users browser session
 func (s *server) writeCookie(w http.ResponseWriter, name string, value string, maxAge int) {
 	c := &http.Cookie{
 		Name:     name,
@@ -140,6 +151,7 @@ func (s *server) writeCookie(w http.ResponseWriter, name string, value string, m
 
 var name = "phragmosis"
 
+// serve client metadata document for oauth
 func (s *server) handleClientMetadata(w http.ResponseWriter, r *http.Request) {
 	doc := s.atprotoOAuth.Config.ClientMetadata()
 	doc.ClientName = &name
@@ -151,6 +163,8 @@ func (s *server) handleClientMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+// backend route to resolve did & begin atproto oauth flow
 func (s *server) handleResolveDid(w http.ResponseWriter, r *http.Request) {
 	var ctx = r.Context()
 	hand, err := syntax.ParseHandle(r.FormValue("handle"))
@@ -178,6 +192,8 @@ func (s *server) handleResolveDid(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+
+// atproto callback
 func (s *server) atprotoHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	ses, err := s.atprotoOAuth.ProcessCallback(r.Context(), r.Form)
@@ -209,6 +225,7 @@ func (s *server) atprotoHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// render the error page (wip)
 func (s *server) errorHandler(w http.ResponseWriter, r *http.Request) {
 
 	// TODO make error page nice
@@ -217,6 +234,8 @@ func (s *server) errorHandler(w http.ResponseWriter, r *http.Request) {
 		"PageTitle": s.cfg.PageTitle,
 	})
 }
+
+// discord callback
 func (s *server) discordHandler(w http.ResponseWriter, r *http.Request) {
 	ometa, err := getUserMeta(r, s.sc)
 	if err != nil {
@@ -296,6 +315,7 @@ var templates embed.FS
 
 const SEVEN_DAYS = time.Hour * 24 * 7
 
+// correctly instantiate a new server from config
 func newServer(c config, cookie securecookie.SecureCookie, client http.Client, loginTemplate template.Template, errorTemplate template.Template) *server {
 
 	s := &server{
