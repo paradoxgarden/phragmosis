@@ -62,7 +62,7 @@ func (s *server) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	s.writeCookie(w, "oauthMeta", enc, 300)
 
-	discordURL := s.discordOAuth.AuthCodeURL(ometa.CRSFState, oauth2.S256ChallengeOption(ometa.PKCECode))
+	discordURL := s.discordOAuth.AuthCodeURL(ometa.CSRFState, oauth2.S256ChallengeOption(ometa.PKCECode))
 	err = s.loginTemplate.Execute(w, map[string]interface{}{
 		"DiscordRedirect": discordURL,
 		"DiscordVisible":  s.discord,

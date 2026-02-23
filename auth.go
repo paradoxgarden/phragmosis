@@ -13,7 +13,7 @@ import (
 )
 
 type oauthMeta struct {
-	CRSFState string
+	CSRFState string
 	PKCECode  string
 	Redirect  string
 }
@@ -62,9 +62,9 @@ func getUserMeta(r *http.Request, sc securecookie.SecureCookie) (*oauthMeta, err
 		return nil, err
 	}
 	state := r.FormValue("state")
-	if ometa.CRSFState != state {
-		return nil, &CRSFError{
-			orig: ometa.CRSFState,
+	if ometa.CSRFState != state {
+		return nil, &CSRFError{
+			orig: ometa.CSRFState,
 			new:  state,
 		}
 	}
@@ -72,12 +72,12 @@ func getUserMeta(r *http.Request, sc securecookie.SecureCookie) (*oauthMeta, err
 
 }
 
-type CRSFError struct {
+type CSRFError struct {
 	orig string
 	new  string
 }
 
-func (e *CRSFError) Error() string {
+func (e *CSRFError) Error() string {
 	return fmt.Sprintf("CSRF validation error: %s vs %s", e.orig, e.new)
 }
 
@@ -125,9 +125,9 @@ func genOAuthMeta(redirect string) (*oauthMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	crsfState := base64.URLEncoding.EncodeToString(stateRand)
+	csrfState := base64.URLEncoding.EncodeToString(stateRand)
 	return &oauthMeta{
-		CRSFState: crsfState,
+		CSRFState: csrfState,
 		PKCECode:  oauth2.GenerateVerifier(),
 		Redirect:  redirect,
 	}, nil
